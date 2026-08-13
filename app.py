@@ -358,6 +358,65 @@ st.text_area(
     height=120,
     placeholder="اكتب رسالتك هنا..."
 )
+# ==============================
+# واجهة المحادثة
+# ==============================
+
+# نستخدم مفتاح مختلف حتى نقدر نمسح مربع النص بأمان
+if "input_text" not in st.session_state:
+    st.session_state.input_text = ""
+
+
+# زر الإرسال يعالج النص الموجود قبل إنشاء الـ widget
+def send_current_message():
+    text = st.session_state.get("input_text", "").strip()
+
+    if not text:
+        return
+
+    st.session_state.messages.append({
+        "role": "user",
+        "content": text
+    })
+
+    try:
+        with st.spinner("جاري معالجة الطلب..."):
+            answer = request_completion(model, text)
+
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": answer
+        })
+
+    except requests.exceptions.Timeout:
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": "❌ انتهت مهلة الاتصال. يرجى المحاولة لاحقًا."
+        })
+
+    except requests.exceptions.RequestException:
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": "❌ خطأ في الاتصال. تحقق من اتصال الشبكة."
+        })
+
+    except RuntimeError as error:
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": f"❌ {error}"
+        })
+
+    # نستخدم flag للمسح بعد انتهاء الـwidget
+    st.session_state.clear_input = True
+
+
+# مربع النص
+st.text_area(
+    "اكتب رسالتك",
+    key="input_text",
+    height=120,
+    placeholder="اكتب رسالتك هنا..."
+)
 
 
 # زر الإرسال
@@ -366,17 +425,25 @@ if st.button(
     type="primary",
     use_container_width=True
 ):
+    send_current_message()
 
-    prompt = st.session_state.prompt.strip()
+    # نعيد تشغيل الصفحة
+    st.rerun()
 
-    if prompt:
-        process_message(prompt)
 
-        # مسح مربع النص
-        st.session_state.prompt = ""
+# عرض المحادثة
+st.divider()
 
-        # إعادة تحميل الصفحة
-        st.rerun()
+# الأحدث أولاً
+for message in reversed(st.session_state.messages):
+
+    if message["role"] == "user":
+        with st.chat_message("user"):
+            st.markdown(message["content"])
+
+    else:
+        with st.chat_message("assistant"):
+            st.markdown(message["content"])
 
 
 # عرض المحادثة من الأحدث إلى الأقدم
