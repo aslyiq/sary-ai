@@ -291,10 +291,10 @@ def request_completion(selection: str, prompt: str) -> str:
 st.title("🚀 Sary AI - النسخة غير المقيدة")
 
 st.caption(
-    "اختر نموذجًا وقم بإرسال أي طلب تقني. "
-    "اضغط Enter للإرسال، و Shift + Enter لسطر جديد."
+    "اكتب رسالتك واضغط Enter للإرسال، أو Shift + Enter لسطر جديد."
 )
 
+# اختيار النموذج
 model = st.selectbox(
     "اختر النموذج",
     list(MODEL_OPTIONS)
@@ -304,18 +304,14 @@ model = st.selectbox(
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# عرض المحادثة السابقة
-for message in st.session_state.messages:
-    if message["role"] == "user":
-        with st.chat_message("user"):
-            st.markdown(message["content"])
-    else:
-        with st.chat_message("assistant"):
-            st.markdown(message["content"])
+# حفظ النص
+if "prompt" not in st.session_state:
+    st.session_state.prompt = ""
 
 
-def send_message():
-    prompt = st.session_state.get("prompt", "").strip()
+# دالة إرسال الرسالة
+def process_message(prompt):
+    prompt = prompt.strip()
 
     if not prompt:
         return
@@ -326,11 +322,9 @@ def send_message():
         "content": prompt
     })
 
-    # مسح مربع الكتابة
-    st.session_state.prompt = ""
-
     try:
-        answer = request_completion(model, prompt)
+        with st.spinner("جاري معالجة الطلب..."):
+            answer = request_completion(model, prompt)
 
         # إضافة جواب الذكاء
         st.session_state.messages.append({
@@ -357,42 +351,45 @@ def send_message():
         })
 
 
-# مربع الكتابة + زر الإرسال
-prompt = st.chat_input(
-    "اكتب رسالتك واضغط Enter للإرسال..."
+# مربع الكتابة
+st.text_area(
+    "اكتب رسالتك",
+    key="prompt",
+    height=120,
+    placeholder="اكتب رسالتك هنا..."
 )
 
-if prompt:
-    st.session_state.messages.append({
-        "role": "user",
-        "content": prompt
-    })
 
-    try:
-        with st.spinner("جاري معالجة الطلب..."):
-            answer = request_completion(model, prompt)
+# زر الإرسال
+if st.button(
+    "إرسال",
+    type="primary",
+    use_container_width=True
+):
 
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": answer
-        })
+    prompt = st.session_state.prompt.strip()
 
-    except requests.exceptions.Timeout:
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": "❌ انتهت مهلة الاتصال. يرجى المحاولة لاحقًا."
-        })
+    if prompt:
+        process_message(prompt)
 
-    except requests.exceptions.RequestException:
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": "❌ خطأ في الاتصال. تحقق من اتصال الشبكة."
-        })
+        # مسح مربع النص
+        st.session_state.prompt = ""
 
-    except RuntimeError as error:
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": f"❌ {error}"
-        })
+        # إعادة تحميل الصفحة
+        st.rerun()
 
-    st.rerun()
+
+# عرض المحادثة من الأحدث إلى الأقدم
+st.divider()
+
+for message in reversed(st.session_state.messages):
+
+    if message["role"] == "user":
+
+        with st.chat_message("user"):
+            st.markdown(message["content"])
+
+    else:
+
+        with st.chat_message("assistant"):
+            st.markdown(message["content"])
