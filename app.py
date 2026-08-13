@@ -288,43 +288,49 @@ def request_completion(selection: str, prompt: str) -> str:
         return request_replicate(api_key, prompt)
     raise RuntimeError(f"مزود غير مدعوم: {provider}")
 
-st.title("🚀 Sary AI - النسخة غير المقيدة")
+st.title("🚀 Sary AI")
 
-st.caption(
-    "اكتب رسالتك واضغط Enter للإرسال، أو Shift + Enter لسطر جديد."
-)
+st.caption("اختر الذكاء واكتب رسالتك ثم اضغط Enter أو زر إرسال.")
 
+# =========================
 # اختيار النموذج
+# =========================
+
 model = st.selectbox(
     "اختر النموذج",
     list(MODEL_OPTIONS)
 )
 
+# =========================
 # حفظ المحادثة
+# =========================
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# حفظ النص
-if "prompt" not in st.session_state:
-    st.session_state.prompt = ""
+if "prompt_value" not in st.session_state:
+    st.session_state.prompt_value = ""
 
 
-# دالة إرسال الرسالة
-def process_message(prompt):
-    prompt = prompt.strip()
+# =========================
+# إرسال الرسالة
+# =========================
 
-    if not prompt:
+def send_message(text):
+    text = text.strip()
+
+    if not text:
         return
 
     # إضافة رسالة المستخدم
     st.session_state.messages.append({
         "role": "user",
-        "content": prompt
+        "content": text
     })
 
     try:
         with st.spinner("جاري معالجة الطلب..."):
-            answer = request_completion(model, prompt)
+            answer = request_completion(model, text)
 
         # إضافة جواب الذكاء
         st.session_state.messages.append({
@@ -335,7 +341,7 @@ def process_message(prompt):
     except requests.exceptions.Timeout:
         st.session_state.messages.append({
             "role": "assistant",
-            "content": "❌ انتهت مهلة الاتصال. يرجى المحاولة لاحقًا."
+            "content": "❌ انتهت مهلة الاتصال."
         })
 
     except requests.exceptions.RequestException:
@@ -351,104 +357,58 @@ def process_message(prompt):
         })
 
 
-# مربع الكتابة
-st.text_area(
-    "اكتب رسالتك",
-    key="prompt",
-    height=120,
-    placeholder="اكتب رسالتك هنا..."
-)
-# ==============================
-# واجهة المحادثة
-# ==============================
+# =========================
+# مربع الكتابة + زر الإرسال
+# =========================
 
-# نستخدم مفتاح مختلف حتى نقدر نمسح مربع النص بأمان
-if "input_text" not in st.session_state:
-    st.session_state.input_text = ""
+col1, col2 = st.columns([5, 1])
 
+with col1:
+    prompt = st.text_input(
+        "اكتب رسالتك",
+        key="prompt_value",
+        placeholder="اكتب رسالتك واضغط Enter..."
+    )
 
-# زر الإرسال يعالج النص الموجود قبل إنشاء الـ widget
-def send_current_message():
-    text = st.session_state.get("input_text", "").strip()
-
-    if not text:
-        return
-
-    st.session_state.messages.append({
-        "role": "user",
-        "content": text
-    })
-
-    try:
-        with st.spinner("جاري معالجة الطلب..."):
-            answer = request_completion(model, text)
-
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": answer
-        })
-
-    except requests.exceptions.Timeout:
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": "❌ انتهت مهلة الاتصال. يرجى المحاولة لاحقًا."
-        })
-
-    except requests.exceptions.RequestException:
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": "❌ خطأ في الاتصال. تحقق من اتصال الشبكة."
-        })
-
-    except RuntimeError as error:
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": f"❌ {error}"
-        })
-
-    # نستخدم flag للمسح بعد انتهاء الـwidget
-    st.session_state.clear_input = True
+with col2:
+    st.write("")
+    st.write("")
+    send_button = st.button(
+        "إرسال",
+        type="primary",
+        use_container_width=True
+    )
 
 
-# مربع النص
-st.text_area(
-    "اكتب رسالتك",
-    key="input_text",
-    height=120,
-    placeholder="اكتب رسالتك هنا..."
-)
+# =========================
+# Enter أو زر إرسال
+# =========================
 
+if prompt and prompt.strip():
+    # text_input يرسل عند Enter
+    send_message(prompt)
 
-# زر الإرسال
-if st.button(
-    "إرسال",
-    type="primary",
-    use_container_width=True
-):
-    send_current_message()
+    # تنظيف مربع الكتابة عن طريق تغيير المفتاح
+    st.session_state.prompt_value = ""
 
-    # نعيد تشغيل الصفحة
     st.rerun()
 
+elif send_button:
+    if prompt.strip():
+        send_message(prompt)
 
-# عرض المحادثة
+        st.session_state.prompt_value = ""
+
+        st.rerun()
+
+
+# =========================
+# المحادثة
+# =========================
+
 st.divider()
 
 # الأحدث أولاً
-for message in reversed(st.session_state.messages):
-
-    if message["role"] == "user":
-        with st.chat_message("user"):
-            st.markdown(message["content"])
-
-    else:
-        with st.chat_message("assistant"):
-            st.markdown(message["content"])
-
-
-# عرض المحادثة من الأحدث إلى الأقدم
-st.divider()
-
 for message in reversed(st.session_state.messages):
 
     if message["role"] == "user":
