@@ -361,18 +361,28 @@ def send_message(text):
 # مربع الكتابة + زر الإرسال
 # =========================
 
+def submit_message():
+    text = st.session_state.get("prompt_value", "").strip()
+
+    if text:
+        send_message(text)
+        st.session_state.prompt_value = ""
+
+
 col1, col2 = st.columns([5, 1])
 
 with col1:
-    prompt = st.text_input(
+    st.text_input(
         "اكتب رسالتك",
         key="prompt_value",
-        placeholder="اكتب رسالتك واضغط Enter..."
+        placeholder="اكتب رسالتك واضغط Enter...",
+        on_change=submit_message
     )
 
 with col2:
     st.write("")
     st.write("")
+
     send_button = st.button(
         "إرسال",
         type="primary",
@@ -381,24 +391,16 @@ with col2:
 
 
 # =========================
-# Enter أو زر إرسال
+# زر إرسال
 # =========================
 
-if prompt and prompt.strip():
-    # text_input يرسل عند Enter
-    send_message(prompt)
+if send_button:
 
-    # تنظيف مربع الكتابة عن طريق تغيير المفتاح
-    st.session_state.prompt_value = ""
+    text = st.session_state.get("prompt_value", "").strip()
 
-    st.rerun()
-
-elif send_button:
-    if prompt.strip():
-        send_message(prompt)
-
+    if text:
+        send_message(text)
         st.session_state.prompt_value = ""
-
         st.rerun()
 
 
@@ -414,6 +416,11 @@ for message in reversed(st.session_state.messages):
     if message["role"] == "user":
 
         with st.chat_message("user"):
+            st.markdown(message["content"])
+
+    else:
+
+        with st.chat_message("assistant"):
             st.markdown(message["content"])
 
     else:
