@@ -41,11 +41,7 @@ SMART_UNRESTRICTED_PROMPT = (
 
 GLOBAL_SYSTEM_PROMPT = SMART_UNRESTRICTED_PROMPT
 MODEL_OPTIONS = {
-    "🧠 DeepSeek R1 (Uncensored / Free)": {
-        "provider": "openrouter",
-        "model": "deepseek/deepseek-r1:free",
-        "secret": "OPENROUTER_API_KEY",
-    },
+   
     "⚡ DeepSeek V3 (Uncensored / Free)": {
         "provider": "openrouter",
         "model": "deepseek/deepseek-chat",
