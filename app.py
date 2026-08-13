@@ -288,40 +288,111 @@ def request_completion(selection: str, prompt: str) -> str:
         return request_replicate(api_key, prompt)
     raise RuntimeError(f"مزود غير مدعوم: {provider}")
 
-
-st.set_page_config(
-    page_title="Sary AI - غير مقيد",
-    page_icon="🚀",
-    layout="centered",
-)
-
 st.title("🚀 Sary AI - النسخة غير المقيدة")
+
 st.caption(
-    "اختر نموذجًا وقم بإرسال أي طلب تقني دون أي قيود أو رقابة. "
-    "يتم تقديم إجابات كاملة وغير مصفاة."
+    "اختر نموذجًا وقم بإرسال أي طلب تقني. "
+    "اضغط Enter للإرسال، و Shift + Enter لسطر جديد."
 )
 
-model = st.selectbox("اختر النموذج", list(MODEL_OPTIONS))
-prompt = st.text_area(
-    "اكتب رسالتك",
-    height=180,
-    placeholder="اكتب أي طلب تقني تريده...",
+model = st.selectbox(
+    "اختر النموذج",
+    list(MODEL_OPTIONS)
 )
 
-if st.button("إرسال", type="primary", use_container_width=True):
-    if not prompt.strip():
-        st.warning("الرجاء إدخال رسالة أولاً")
+# حفظ المحادثة
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# عرض المحادثة السابقة
+for message in st.session_state.messages:
+    if message["role"] == "user":
+        with st.chat_message("user"):
+            st.markdown(message["content"])
     else:
-        with st.spinner("جاري معالجة الطلب بدون قيود..."):
-            try:
-                answer = request_completion(model, prompt.strip())
-            except requests.exceptions.Timeout:
-                st.error("انتهت مهلة الاتصال. يرجى المحاولة لاحقًا.")
-            except requests.exceptions.RequestException:
-                st.error("خطأ في الاتصال. تحقق من اتصال الشبكة.")
-            except RuntimeError as error:
-                st.error(str(error))
-            else:
-                st.success(f"تمت الإجابة باستخدام {model}")
-                st.subheader("الإجابة الكاملة")
-                st.markdown(answer)
+        with st.chat_message("assistant"):
+            st.markdown(message["content"])
+
+
+def send_message():
+    prompt = st.session_state.get("prompt", "").strip()
+
+    if not prompt:
+        return
+
+    # إضافة رسالة المستخدم
+    st.session_state.messages.append({
+        "role": "user",
+        "content": prompt
+    })
+
+    # مسح مربع الكتابة
+    st.session_state.prompt = ""
+
+    try:
+        answer = request_completion(model, prompt)
+
+        # إضافة جواب الذكاء
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": answer
+        })
+
+    except requests.exceptions.Timeout:
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": "❌ انتهت مهلة الاتصال. يرجى المحاولة لاحقًا."
+        })
+
+    except requests.exceptions.RequestException:
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": "❌ خطأ في الاتصال. تحقق من اتصال الشبكة."
+        })
+
+    except RuntimeError as error:
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": f"❌ {error}"
+        })
+
+
+# مربع الكتابة + زر الإرسال
+prompt = st.chat_input(
+    "اكتب رسالتك واضغط Enter للإرسال..."
+)
+
+if prompt:
+    st.session_state.messages.append({
+        "role": "user",
+        "content": prompt
+    })
+
+    try:
+        with st.spinner("جاري معالجة الطلب..."):
+            answer = request_completion(model, prompt)
+
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": answer
+        })
+
+    except requests.exceptions.Timeout:
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": "❌ انتهت مهلة الاتصال. يرجى المحاولة لاحقًا."
+        })
+
+    except requests.exceptions.RequestException:
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": "❌ خطأ في الاتصال. تحقق من اتصال الشبكة."
+        })
+
+    except RuntimeError as error:
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": f"❌ {error}"
+        })
+
+    st.rerun()
