@@ -298,7 +298,7 @@ def request_replicate(api_key: str, prompt: str, max_tokens: int) -> str:
 
 def request_completion(selection: str, prompt: str) -> str:
     config = MODEL_OPTIONS[selection]
-    api_key = os.getenv(config["secret"])
+    api_key = st.secrets.get(config["secret"]) or os.getenv(config["secret"])
     if not api_key:
         raise RuntimeError(
             f"لم يتم إعداد مفتاح {config['provider']}. تحقق من Replit Secrets."
