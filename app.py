@@ -51,10 +51,10 @@ MODEL_OPTIONS = {
         "secret": "GROQ_API_KEY",
         "max_tokens": 2048,
     },
-    "🧠 DeepSeek R1": {
-        "provider": "deepseek",
-        "model": "deepseek-reasoner",
-        "secret": "DEEPSEEK_API_KEY",
+    "🧠 DeepSeek R1 (Free)": {
+        "provider": "openrouter",
+        "model": "deepseek/deepseek-r1:free",
+        "secret": "OPENROUTER_API_KEY",
         "max_tokens": 4096,  # موديل استدلال، يحتاج مساحة أكبر لخطوات التفكير
     },
     "⚡ DeepSeek V3 (Free)": {
@@ -171,10 +171,15 @@ def request_openai_compatible(
         data: Any = response.json()
         message = extract_text(data["choices"][0]["message"]["content"])
     except (ValueError, KeyError, IndexError, TypeError) as error:
-        raise RuntimeError(f"وصلت استجابة غير متوقعة من {provider}.") from error
+        raise RuntimeError(
+            f"[{provider}] استجابة غير متوقعة (رمز الحالة {response.status_code}): "
+            f"{type(error).__name__}: {error} — النص الخام: {response.text[:300]}"
+        ) from error
 
     if not message:
-        raise RuntimeError(f"لم يُرجع {provider} نصًا للعرض.")
+        raise RuntimeError(
+            f"[{provider}] لم يُرجع نصًا للعرض. الرد الخام: {response.text[:300]}"
+        )
     return message
 
 
@@ -201,10 +206,15 @@ def request_gemini(api_key: str, model: str, prompt: str, max_tokens: int) -> st
         data: Any = response.json()
         message = extract_text(data["candidates"][0]["content"]["parts"])
     except (ValueError, KeyError, IndexError, TypeError) as error:
-        raise RuntimeError("وصلت استجابة غير متوقعة من Google Gemini.") from error
+        raise RuntimeError(
+            f"[Google Gemini] استجابة غير متوقعة (رمز الحالة {response.status_code}): "
+            f"{type(error).__name__}: {error} — النص الخام: {response.text[:300]}"
+        ) from error
 
     if not message:
-        raise RuntimeError("لم يُرجع Google Gemini نصًا للعرض.")
+        raise RuntimeError(
+            f"[Google Gemini] لم يُرجع نصًا للعرض. الرد الخام: {response.text[:300]}"
+        )
     return message
 
 
@@ -241,9 +251,14 @@ def request_replicate(api_key: str, prompt: str, max_tokens: int) -> str:
             message = extract_text(prediction.get("output"))
             if message:
                 return message
-            raise RuntimeError("لم يُرجع Replicate رابط متابعة للتنبؤ.")
+            raise RuntimeError(
+                f"[Replicate] لم يُرجع رابط متابعة للتنبؤ. الرد الخام: {response.text[:300]}"
+            )
     except (ValueError, AttributeError, TypeError) as error:
-        raise RuntimeError("وصلت استجابة غير متوقعة من Replicate.") from error
+        raise RuntimeError(
+            f"[Replicate] استجابة غير متوقعة (رمز الحالة {response.status_code}): "
+            f"{type(error).__name__}: {error} — النص الخام: {response.text[:300]}"
+        ) from error
 
     deadline = time.monotonic() + 90
     while time.monotonic() < deadline:
@@ -256,15 +271,17 @@ def request_replicate(api_key: str, prompt: str, max_tokens: int) -> str:
             message = extract_text(prediction.get("output"))
             if message:
                 return message
-            raise RuntimeError("أكمل Replicate الطلب دون نص للعرض.")
+            raise RuntimeError(
+                f"[Replicate] اكتمل الطلب دون نص للعرض. الرد الخام: {poll_response.text[:300]}"
+            )
         if status in {"failed", "canceled"}:
             raise RuntimeError(
-                prediction.get("error")
-                or f"انتهى طلب Replicate بالحالة: {status}."
+                f"[Replicate] فشل الطلب بالحالة {status}: "
+                f"{prediction.get('error') or poll_response.text[:300]}"
             )
         time.sleep(1.5)
 
-    raise RuntimeError("انتهت مهلة انتظار استجابة Replicate.")
+    raise RuntimeError("[Replicate] انتهت مهلة انتظار الاستجابة (90 ثانية).")
 
 
 def request_completion(selection: str, prompt: str) -> str:
@@ -272,7 +289,8 @@ def request_completion(selection: str, prompt: str) -> str:
     api_key = os.getenv(config["secret"])
     if not api_key:
         raise RuntimeError(
-            f"لم يتم إعداد مفتاح {config['provider']}. تحقق من Replit Secrets."
+            f"لم يتم إعداد المفتاح '{config['secret']}' بـ Replit Secrets "
+            f"(مطلوب لتشغيل موديل '{selection}')."
         )
 
     max_tokens = config.get("max_tokens", DEFAULT_MAX_TOKENS)
