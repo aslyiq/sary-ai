@@ -10,12 +10,18 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models"
-HUGGINGFACE_URL = (
-    "https://api-inference.huggingface.co/models/mistralai/"
-    "Mistral-7B-Instruct-v0.3"
-)
+# Hugging Face أوقفوا api-inference.huggingface.co القديم، والبديل الرسمي
+# الحين هو router.huggingface.co بصيغة متوافقة مع OpenAI (chat/completions)
+HUGGINGFACE_URL = "https://router.huggingface.co/v1/chat/completions"
 REPLICATE_MODEL = "mikeei/dolphin-2.9-llama3-70b-gguf"
-REPLICATE_URL = f"https://api.replicate.com/v1/models/{REPLICATE_MODEL}/predictions"
+# هذا موديل مجتمعي (community model) مو رسمي (official)، فرابط
+# /v1/models/{owner}/{name}/predictions المختصر ما يشتغل وياه (يرجع 404) -
+# هذا الرابط مخصص للموديلات الرسمية بس. الموديلات المجتمعية تحتاج
+# الرابط العام /v1/predictions مع تحديد رقم النسخة (hash) صراحة بالطلب.
+REPLICATE_URL = "https://api.replicate.com/v1/predictions"
+REPLICATE_VERSION = (
+    "74d4ba9f5107073a5840b5a111d16d5159e5ec67f3d66590c83fe8b5d0f752e8"
+)
 
 # قيمة افتراضية لعدد التوكنز إذا الموديل ما حدد رقم خاص فيه بـ MODEL_OPTIONS
 DEFAULT_MAX_TOKENS = 2048
@@ -218,38 +224,6 @@ def compose_text_prompt(prompt: str) -> str:
     )
 
 
-def request_huggingface(api_key: str, prompt: str, max_tokens: int) -> str:
-    response = requests.post(
-        HUGGINGFACE_URL,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "inputs": compose_text_prompt(prompt),
-            "parameters": {
-                "max_new_tokens": max_tokens,
-                "return_full_text": False,
-            },
-        },
-        timeout=90,
-    )
-    raise_for_provider_error(response, "Hugging Face")
-
-    try:
-        data: Any = response.json()
-        if isinstance(data, list):
-            message = extract_text(data[0]["generated_text"])
-        else:
-            message = extract_text(data["generated_text"])
-    except (ValueError, KeyError, IndexError, TypeError) as error:
-        raise RuntimeError("وصلت استجابة غير متوقعة من Hugging Face.") from error
-
-    if not message:
-        raise RuntimeError("لم يُرجع Hugging Face نصًا للعرض.")
-    return message
-
-
 def request_replicate(api_key: str, prompt: str, max_tokens: int) -> str:
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -259,10 +233,11 @@ def request_replicate(api_key: str, prompt: str, max_tokens: int) -> str:
         REPLICATE_URL,
         headers=headers,
         json={
+            "version": REPLICATE_VERSION,
             "input": {
                 "prompt": compose_text_prompt(prompt),
                 "max_new_tokens": max_tokens,
-            }
+            },
         },
         timeout=90,
     )
@@ -326,7 +301,9 @@ def request_completion(selection: str, prompt: str) -> str:
     if provider == "gemini":
         return request_gemini(api_key, config["model"], prompt, max_tokens)
     if provider == "huggingface":
-        return request_huggingface(api_key, prompt, max_tokens)
+        return request_openai_compatible(
+            api_key, HUGGINGFACE_URL, config["model"], prompt, "Hugging Face", max_tokens
+        )
     if provider == "replicate":
         return request_replicate(api_key, prompt, max_tokens)
     raise RuntimeError(f"مزود غير مدعوم: {provider}")
