@@ -17,6 +17,9 @@ HUGGINGFACE_URL = (
 REPLICATE_MODEL = "mikeei/dolphin-2.9-llama3-70b-gguf"
 REPLICATE_URL = f"https://api.replicate.com/v1/models/{REPLICATE_MODEL}/predictions"
 
+# قيمة افتراضية لعدد التوكنز إذا الموديل ما حدد رقم خاص فيه بـ MODEL_OPTIONS
+DEFAULT_MAX_TOKENS = 2048
+
 # Direct, complete technical help is encouraged, but the app does not attempt
 # to bypass provider safeguards or provide instructions that facilitate harm.
 GLOBAL_SYSTEM_PROMPT = (
@@ -42,52 +45,62 @@ SMART_UNRESTRICTED_PROMPT = (
 
 GLOBAL_SYSTEM_PROMPT = SMART_UNRESTRICTED_PROMPT
 MODEL_OPTIONS = {
-   
-    "⚡ DeepSeek V3 (Free)": {
-        "provider": "openrouter",
-        "model": "deepseek/deepseek-chat",
-        "secret": "OPENROUTER_API_KEY",
-    },
-    "🧠 DeepSeek R1": {
-        "provider": "deepseek",
-        "model": "deepseek-reasoner",
-        "secret": "DEEPSEEK_API_KEY",
-    },
-    "🚀 Groq: Llama 3.3 70B (Unrestricted)": {
-        "provider": "groq",
-        "model": "llama-3.3-70b-versatile",
-        "secret": "GROQ_API_KEY",
-    },
-    "🌐 OpenRouter: Perplexity Sonar (Web Search)": {
-        "provider": "openrouter",
-        "model": "perplexity/sonar",
-        "secret": "OPENROUTER_API_KEY",
-    },
-    "🤖 OpenRouter: Hermes 3 Llama 3.1": {
-        "provider": "openrouter",
-        "model": "nousresearch/hermes-3-llama-3.1-405b",
-        "secret": "OPENROUTER_API_KEY",
-    },
-    "✨ Gemini 1.5 Flash (Unrestricted)": {
-        "provider": "gemini",
-        "model": "gemini-1.5-flash",
-        "secret": "GEMINI_API_KEY",
-    },
-    "🌟 Gemini 1.5 Pro (Unrestricted)": {
-        "provider": "gemini",
-        "model": "gemini-1.5-pro",
-        "secret": "GEMINI_API_KEY",
-    },
-    "🤗 HuggingFace: Mistral 7B (Unrestricted)": {
-        "provider": "huggingface",
-        "model": "mistralai/Mistral-7B-Instruct-v0.3",
-        "secret": "HUGGINGFACE_API_KEY",
-    },
     "🌀 Replicate: Llama 3 Uncensored": {
         "provider": "replicate",
         "model": REPLICATE_MODEL,
         "secret": "REPLICATE_API_KEY",
+        "max_tokens": 1024,
     },
+   "🤗 HuggingFace: Mistral 7B (Unrestricted)": {
+        "provider": "huggingface",
+        "model": "mistralai/Mistral-7B-Instruct-v0.3",
+        "secret": "HUGGINGFACE_API_KEY",
+        "max_tokens": 1024,
+     },
+    "⚡ DeepSeek V3 (Free)": {
+        "provider": "openrouter",
+        "model": "deepseek/deepseek-chat",
+        "secret": "OPENROUTER_API_KEY",
+        "max_tokens": 2048,
+     },
+   "🧠 DeepSeek R1": {
+        "provider": "deepseek",
+        "model": "deepseek-reasoner",
+        "secret": "DEEPSEEK_API_KEY",
+        "max_tokens": 4096,  # موديل استدلال، يحتاج مساحة أكبر لخطوات التفكير
+    }, 
+    "🚀 Groq: Llama 3.3 70B (Unrestricted)": {
+        "provider": "groq",
+        "model": "llama-3.3-70b-versatile",
+        "secret": "GROQ_API_KEY",
+        "max_tokens": 2048,
+     },
+    "🌐 OpenRouter: Perplexity Sonar (Web Search)": {
+        "provider": "openrouter",
+        "model": "perplexity/sonar",
+        "secret": "OPENROUTER_API_KEY",
+        "max_tokens": 3000,  # يحتاج مساحة أكبر لإرجاع نتائج البحث بالويب
+     },
+    "🤖 OpenRouter: Hermes 3 Llama 3.1": {
+        "provider": "openrouter",
+        "model": "nousresearch/hermes-3-llama-3.1-405b",
+        "secret": "OPENROUTER_API_KEY",
+        "max_tokens": 2048,
+     },
+    "✨ Gemini 1.5 Flash (Unrestricted)": {
+        "provider": "gemini",
+        "model": "gemini-1.5-flash",
+        "secret": "GEMINI_API_KEY",
+        "max_tokens": 2048,
+     },
+    "🌟 Gemini 1.5 Pro (Unrestricted)": {
+        "provider": "gemini",
+        "model": "gemini-1.5-pro",
+        "secret": "GEMINI_API_KEY",
+        "max_tokens": 2048,
+     },
+   
+   
 }
 
 
@@ -127,7 +140,12 @@ def extract_text(value: Any) -> str:
 
 
 def request_openai_compatible(
-    api_key: str, endpoint: str, model: str, prompt: str, provider: str
+    api_key: str,
+    endpoint: str,
+    model: str,
+    prompt: str,
+    provider: str,
+    max_tokens: int,
 ) -> str:
     response = requests.post(
         endpoint,
@@ -137,6 +155,7 @@ def request_openai_compatible(
         },
         json={
             "model": model,
+            "max_tokens": max_tokens,
             "messages": [
                 {"role": "system", "content": GLOBAL_SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
@@ -157,7 +176,7 @@ def request_openai_compatible(
     return message
 
 
-def request_gemini(api_key: str, model: str, prompt: str) -> str:
+def request_gemini(api_key: str, model: str, prompt: str, max_tokens: int) -> str:
     response = requests.post(
         f"{GEMINI_URL}/{model}:generateContent",
         params={"key": api_key},
@@ -170,6 +189,7 @@ def request_gemini(api_key: str, model: str, prompt: str) -> str:
                     "parts": [{"text": prompt}],
                 }
             ],
+            "generationConfig": {"maxOutputTokens": max_tokens},
         },
         timeout=90,
     )
@@ -193,7 +213,7 @@ def compose_text_prompt(prompt: str) -> str:
     )
 
 
-def request_huggingface(api_key: str, prompt: str) -> str:
+def request_huggingface(api_key: str, prompt: str, max_tokens: int) -> str:
     response = requests.post(
         HUGGINGFACE_URL,
         headers={
@@ -203,7 +223,7 @@ def request_huggingface(api_key: str, prompt: str) -> str:
         json={
             "inputs": compose_text_prompt(prompt),
             "parameters": {
-                "max_new_tokens": 1024,
+                "max_new_tokens": max_tokens,
                 "return_full_text": False,
             },
         },
@@ -225,7 +245,7 @@ def request_huggingface(api_key: str, prompt: str) -> str:
     return message
 
 
-def request_replicate(api_key: str, prompt: str) -> str:
+def request_replicate(api_key: str, prompt: str, max_tokens: int) -> str:
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -236,7 +256,7 @@ def request_replicate(api_key: str, prompt: str) -> str:
         json={
             "input": {
                 "prompt": compose_text_prompt(prompt),
-                "max_new_tokens": 1024,
+                "max_new_tokens": max_tokens,
             }
         },
         timeout=90,
@@ -284,25 +304,26 @@ def request_completion(selection: str, prompt: str) -> str:
             f"لم يتم إعداد مفتاح {config['provider']}. تحقق من Replit Secrets."
         )
 
+    max_tokens = config.get("max_tokens", DEFAULT_MAX_TOKENS)
     provider = config["provider"]
     if provider == "openrouter":
         return request_openai_compatible(
-            api_key, OPENROUTER_URL, config["model"], prompt, "OpenRouter"
+            api_key, OPENROUTER_URL, config["model"], prompt, "OpenRouter", max_tokens
         )
     if provider == "deepseek":
         return request_openai_compatible(
-            api_key, DEEPSEEK_URL, config["model"], prompt, "DeepSeek"
+            api_key, DEEPSEEK_URL, config["model"], prompt, "DeepSeek", max_tokens
         )
     if provider == "groq":
         return request_openai_compatible(
-            api_key, GROQ_URL, config["model"], prompt, "Groq"
+            api_key, GROQ_URL, config["model"], prompt, "Groq", max_tokens
         )
     if provider == "gemini":
-        return request_gemini(api_key, config["model"], prompt)
+        return request_gemini(api_key, config["model"], prompt, max_tokens)
     if provider == "huggingface":
-        return request_huggingface(api_key, prompt)
+        return request_huggingface(api_key, prompt, max_tokens)
     if provider == "replicate":
-        return request_replicate(api_key, prompt)
+        return request_replicate(api_key, prompt, max_tokens)
     raise RuntimeError(f"مزود غير مدعوم: {provider}")
 
 
@@ -324,39 +345,33 @@ model = st.selectbox("اختر النموذج", list(MODEL_OPTIONS))
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# اعرض الرسائل السابقة فوق (كل واحدة تنزل تحت الثانية بالتسلسل)
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+# مكان ثابت تُعرض بداخله الرسائل (فوق مربع الإدخال بالأسفل)
+messages_container = st.container()
 
-# st.chat_input يعطي بالضبط السلوك المطلوب:
+# st.chat_input ثابت بأسفل الشاشة دائماً (تصميم Streamlit):
 # - Enter يرسل الرسالة مباشرة
 # - Shift+Enter ينزل سطر جديد داخل الصندوق
-# - الصندوق يفرغ نفسه تلقائياً بعد الإرسال، والرسالة تنزل تحت بالسجل
+# - الصندوق يفرغ نفسه تلقائياً بعد الإرسال
 prompt = st.chat_input("ما الذي تريد أن تسأل عنه؟")
 
 if prompt:
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+    st.session_state.messages.append({"role": "user", "content": prompt.strip()})
+    with st.spinner("جاري الحصول على الإجابة..."):
+        try:
+            answer = request_completion(model, prompt.strip())
+        except requests.exceptions.Timeout:
+            answer = "⚠️ انتهت مهلة الاتصال. حاول مرة أخرى."
+        except requests.exceptions.RequestException:
+            answer = (
+                "⚠️ تعذر الاتصال بخدمة الذكاء الاصطناعي. "
+                "تحقق من الاتصال وحاول مرة أخرى."
+            )
+        except RuntimeError as error:
+            answer = f"⚠️ {error}"
+    st.session_state.messages.append({"role": "assistant", "content": answer})
 
-    with st.chat_message("assistant"):
-        with st.spinner("جاري الحصول على الإجابة..."):
-            try:
-                answer = request_completion(model, prompt.strip())
-            except requests.exceptions.Timeout:
-                answer = None
-                st.error("انتهت مهلة الاتصال. حاول مرة أخرى.")
-            except requests.exceptions.RequestException:
-                answer = None
-                st.error(
-                    "تعذر الاتصال بخدمة الذكاء الاصطناعي. تحقق من الاتصال وحاول مرة أخرى."
-                )
-            except RuntimeError as error:
-                answer = None
-                st.error(str(error))
-            else:
-                st.markdown(answer)
-
-    if answer:
-        st.session_state.messages.append({"role": "assistant", "content": answer})
+# اعرض الرسائل بترتيب عكسي: آخر رسالة تطلع فوق
+with messages_container:
+    for message in reversed(st.session_state.messages):
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
