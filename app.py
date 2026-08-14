@@ -42,15 +42,16 @@ SMART_UNRESTRICTED_PROMPT = (
 
 GLOBAL_SYSTEM_PROMPT = SMART_UNRESTRICTED_PROMPT
 MODEL_OPTIONS = {
-    "🧠 DeepSeek R1": {
-        "provider": "deepseek",
-        "model": "deepseek-reasoner",
-        "secret": "DEEPSEEK_API_KEY",
-    },
+   
     "⚡ DeepSeek V3 (Free)": {
         "provider": "openrouter",
         "model": "deepseek/deepseek-chat",
         "secret": "OPENROUTER_API_KEY",
+    },
+    "🧠 DeepSeek R1": {
+        "provider": "deepseek",
+        "model": "deepseek-reasoner",
+        "secret": "DEEPSEEK_API_KEY",
     },
     "🚀 Groq: Llama 3.3 70B (Unrestricted)": {
         "provider": "groq",
