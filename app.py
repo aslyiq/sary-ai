@@ -10,8 +10,10 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models"
-HUGGINGFACE_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"
-
+HUGGINGFACE_URL = (
+    "https://api-inference.huggingface.co/models/mistralai/"
+    "Mistral-7B-Instruct-v0.3"
+)
 REPLICATE_MODEL = "mikeei/dolphin-2.9-llama3-70b-gguf"
 REPLICATE_URL = f"https://api.replicate.com/v1/models/{REPLICATE_MODEL}/predictions"
 
@@ -49,56 +51,54 @@ MODEL_OPTIONS = {
         "secret": "REPLICATE_API_KEY",
         "max_tokens": 1024,
     },
-   "🤗 HuggingFace: Mistral 7B (Unrestricted)": {
-        "provider": "huggingface",
-        "model": "mistralai/Mistral-7B-Instruct-v0.3",
-        "secret": "HUGGINGFACE_API_KEY",
-        "max_tokens": 1024,
-     },
-    "⚡ DeepSeek V3 (Free)": {
-        "provider": "openrouter",
-        "model": "deepseek/deepseek-chat",
-        "secret": "OPENROUTER_API_KEY",
-        "max_tokens": 2048,
-     },
-   "🧠 DeepSeek R1": {
-        "provider": "deepseek",
-        "model": "deepseek-reasoner",
-        "secret": "DEEPSEEK_API_KEY",
-        "max_tokens": 4096,  # موديل استدلال، يحتاج مساحة أكبر لخطوات التفكير
-    }, 
     "🚀 Groq: Llama 3.3 70B (Unrestricted)": {
         "provider": "groq",
         "model": "llama-3.3-70b-versatile",
         "secret": "GROQ_API_KEY",
         "max_tokens": 2048,
-     },
+    },
+    "🧠 DeepSeek R1": {
+        "provider": "deepseek",
+        "model": "deepseek-reasoner",
+        "secret": "DEEPSEEK_API_KEY",
+        "max_tokens": 4096,  # موديل استدلال، يحتاج مساحة أكبر لخطوات التفكير
+    },
+    "⚡ DeepSeek V3 (Free)": {
+        "provider": "openrouter",
+        "model": "deepseek/deepseek-chat",
+        "secret": "OPENROUTER_API_KEY",
+        "max_tokens": 2048,
+    },
     "🌐 OpenRouter: Perplexity Sonar (Web Search)": {
         "provider": "openrouter",
         "model": "perplexity/sonar",
         "secret": "OPENROUTER_API_KEY",
         "max_tokens": 3000,  # يحتاج مساحة أكبر لإرجاع نتائج البحث بالويب
-     },
+    },
     "🤖 OpenRouter: Hermes 3 Llama 3.1": {
         "provider": "openrouter",
         "model": "nousresearch/hermes-3-llama-3.1-405b",
         "secret": "OPENROUTER_API_KEY",
         "max_tokens": 2048,
-     },
+    },
     "✨ Gemini 1.5 Flash (Unrestricted)": {
         "provider": "gemini",
         "model": "gemini-1.5-flash",
         "secret": "GEMINI_API_KEY",
         "max_tokens": 2048,
-     },
+    },
     "🌟 Gemini 1.5 Pro (Unrestricted)": {
         "provider": "gemini",
         "model": "gemini-1.5-pro",
         "secret": "GEMINI_API_KEY",
         "max_tokens": 2048,
-     },
-   
-   
+    },
+    "🤗 HuggingFace: Mistral 7B (Unrestricted)": {
+        "provider": "huggingface",
+        "model": "mistralai/Mistral-7B-Instruct-v0.3",
+        "secret": "HUGGINGFACE_API_KEY",
+        "max_tokens": 1024,
+    },
 }
 
 
@@ -116,11 +116,18 @@ def raise_for_provider_error(response: requests.Response, provider: str) -> None
     except (ValueError, AttributeError):
         error_message = None
 
-    raise RuntimeError(
-        str(error_message)
-        if error_message
-        else f"تعذر إكمال الطلب من {provider} (رمز الحالة: {response.status_code})."
-    )
+    # لو ما طلعت رسالة واضحة من الـ JSON، اعرض كود الحالة + نص الرد الخام
+    # (حتى لو مو JSON) عشان يبين سبب الخطأ الفعلي بدل رسالة عامة غامضة
+    if not error_message:
+        raw_body = (response.text or "").strip()
+        if raw_body:
+            raw_body = raw_body[:300]  # تقصير النص الطويل جداً
+        error_message = (
+            f"[{provider}] رمز الحالة {response.status_code}"
+            + (f": {raw_body}" if raw_body else "")
+        )
+
+    raise RuntimeError(str(error_message))
 
 
 def extract_text(value: Any) -> str:
@@ -296,7 +303,7 @@ def request_replicate(api_key: str, prompt: str, max_tokens: int) -> str:
 
 def request_completion(selection: str, prompt: str) -> str:
     config = MODEL_OPTIONS[selection]
-    api_key = st.secrets.get(config["secret"]) or os.getenv(config["secret"])
+    api_key = os.getenv(config["secret"])
     if not api_key:
         raise RuntimeError(
             f"لم يتم إعداد مفتاح {config['provider']}. تحقق من Replit Secrets."
@@ -359,10 +366,10 @@ if prompt:
             answer = request_completion(model, prompt.strip())
         except requests.exceptions.Timeout:
             answer = "⚠️ انتهت مهلة الاتصال. حاول مرة أخرى."
-        except requests.exceptions.RequestException:
+        except requests.exceptions.RequestException as error:
             answer = (
-                "⚠️ تعذر الاتصال بخدمة الذكاء الاصطناعي. "
-                "تحقق من الاتصال وحاول مرة أخرى."
+                "⚠️ تعذر الاتصال بخدمة الذكاء الاصطناعي.\n\n"
+                f"تفاصيل الخطأ التقنية: `{error}`"
             )
         except RuntimeError as error:
             answer = f"⚠️ {error}"
