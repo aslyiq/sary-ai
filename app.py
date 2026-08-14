@@ -10,10 +10,8 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models"
-HUGGINGFACE_URL = (
-    "https://api-inference.huggingface.co/models/mistralai/"
-    "Mistral-7B-Instruct-v0.3"
-)
+HUGGINGFACE_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"
+
 REPLICATE_MODEL = "mikeei/dolphin-2.9-llama3-70b-gguf"
 REPLICATE_URL = f"https://api.replicate.com/v1/models/{REPLICATE_MODEL}/predictions"
 
