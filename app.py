@@ -236,17 +236,17 @@ def request_completion(selection: str, prompt: str, base64_image=None, mime_type
 
 
 # -----------------------------------------
-# منطقة تصميم الواجهة (UI) المعدلة بالكامل
+# منطقة تصميم الواجهة (UI) المصححة بالكامل
 # -----------------------------------------
 
 st.set_page_config(page_title="Sary AI", page_icon="🤖", layout="centered")
 
-# 1. الشريط الجانبي (لاختيار النموذج) لجعل الصفحة أنظف
+# 1. الشريط الجانبي
 with st.sidebar:
     st.header("⚙️ الإعدادات")
     model = st.selectbox("اختر النموذج", list(MODEL_OPTIONS))
 
-# 2. العنوان الرئيسي
+# 2. العنوان
 st.title("🤖 Sary AI")
 st.caption("جميع النماذج تدعم رفع الصور، النصوص، وملفات PDF.")
 
@@ -256,21 +256,20 @@ if "messages" not in st.session_state:
 
 messages_container = st.container()
 
-# 4. تصميم احترافي لصندوق البحث (تصحيح التشويه باستخدام st.popover)
+# 4. تصميم شريط البحث الاحترافي (تم إصلاح الخطأ هنا)
 st.markdown("---")
 if "uploaded_file_session" not in st.session_state:
     st.session_state.uploaded_file_session = None
 
-# استخدام 3 أعمدة لإدخال النص والأيقونات بشكل أنيق
 col1, col2, col3 = st.columns([0.2, 8.6, 0.2])
 
 with col1:
-    # st.popover يُنشئ أيقونة صغيرة، عند الضغط عليها تفتح نافذة رفع ملفات صغيرة (بدون تشويه)
-    with st.popover("📎", label_visibility="collapsed"):
+    # إصلاح الخطأ: تم حذف label_visibility من st.popover (لأنها لا تقبل هذا الباراميتر)
+    with st.popover("📎"):
         st.session_state.uploaded_file_session = st.file_uploader(
             "ارفع ملفاً (صور، PDF، نصوص، أكواد)", 
             type=None, 
-            label_visibility="collapsed", 
+            label_visibility="collapsed", # هذا الباراميتر يعمل هنا بشكل صحيح
             key="file_uploader_icon"
         )
 
@@ -282,19 +281,16 @@ with col3:
 
 # 5. منطق الإرسال ومعالجة الملفات
 if send and prompt:
-    # استرجاع الملف من ذاكرة الجلسة
     uploaded_file = st.session_state.uploaded_file_session
     
     file_text = None
     base64_image = None
     mime_type = None
     
-    # معالجة الملف المرفوع إن وجد
     if uploaded_file is not None:
         file_text, base64_image, mime_type = process_uploaded_file(uploaded_file, MODEL_OPTIONS[model])
         if file_text:
             prompt = f"محتوى الملف المرفوع:\n{file_text}\n\nسؤالي:\n{prompt}"
-        # مسح الملف من الجلسة بعد الإرسال
         st.session_state.uploaded_file_session = None
 
     st.session_state.messages.append({"role": "user", "content": prompt.strip()})
@@ -310,7 +306,7 @@ if send and prompt:
             answer = f"⚠️ {error}"
     st.session_state.messages.append({"role": "assistant", "content": answer})
 
-# 6. عرض رسائل المحادثة (مع ظهور الأكواد في صناديق)
+# 6. عرض المحادثة
 with messages_container:
     for message in reversed(st.session_state.messages):
         with st.chat_message(message["role"]):
