@@ -256,22 +256,35 @@ if "messages" not in st.session_state:
 
 messages_container = st.container()
 
-# 4. تصميم احترافي لصندوق البحث مع المرفقات في نفس الصف (أسفل الصفحة)
-st.markdown("---") # خط فاصل
-with st.form(key="chat_form", clear_on_submit=True):
-    cols = st.columns([1, 8, 1]) # تقسيم الشاشة لـ 3 أعمدة
-    with cols[0]:
-        # زر المرفقات (أيقونة بجانب مربع البحث)
-        uploaded_file = st.file_uploader("📎", label_visibility="collapsed", key="file_upload")
-    with cols[1]:
-        # مربع البحث (يدعم الضغط على Enter للإرسال)
-        prompt = st.text_input("اكتب سؤالك هنا...", label_visibility="collapsed", key="user_query")
-    with cols[2]:
-        # زر الإرسال
-        send = st.form_submit_button("➤", type="primary")
+# 4. تصميم احترافي لصندوق البحث (تصحيح التشويه باستخدام st.popover)
+st.markdown("---")
+if "uploaded_file_session" not in st.session_state:
+    st.session_state.uploaded_file_session = None
+
+# استخدام 3 أعمدة لإدخال النص والأيقونات بشكل أنيق
+col1, col2, col3 = st.columns([0.2, 8.6, 0.2])
+
+with col1:
+    # st.popover يُنشئ أيقونة صغيرة، عند الضغط عليها تفتح نافذة رفع ملفات صغيرة (بدون تشويه)
+    with st.popover("📎", label_visibility="collapsed"):
+        st.session_state.uploaded_file_session = st.file_uploader(
+            "ارفع ملفاً (صور، PDF، نصوص، أكواد)", 
+            type=None, 
+            label_visibility="collapsed", 
+            key="file_uploader_icon"
+        )
+
+with col2:
+    prompt = st.text_input("اكتب سؤالك هنا...", label_visibility="collapsed", key="user_query")
+
+with col3:
+    send = st.button("➤", type="primary", key="send_btn")
 
 # 5. منطق الإرسال ومعالجة الملفات
 if send and prompt:
+    # استرجاع الملف من ذاكرة الجلسة
+    uploaded_file = st.session_state.uploaded_file_session
+    
     file_text = None
     base64_image = None
     mime_type = None
@@ -281,6 +294,8 @@ if send and prompt:
         file_text, base64_image, mime_type = process_uploaded_file(uploaded_file, MODEL_OPTIONS[model])
         if file_text:
             prompt = f"محتوى الملف المرفوع:\n{file_text}\n\nسؤالي:\n{prompt}"
+        # مسح الملف من الجلسة بعد الإرسال
+        st.session_state.uploaded_file_session = None
 
     st.session_state.messages.append({"role": "user", "content": prompt.strip()})
     
