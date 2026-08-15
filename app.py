@@ -236,7 +236,7 @@ def request_completion(selection: str, prompt: str, base64_image=None, mime_type
 
 
 # -----------------------------------------
-# منطقة تصميم الواجهة (UI) المصححة بالكامل
+# منطقة تصميم الواجهة (UI) المعدلة للتصحيح النهائي
 # -----------------------------------------
 
 st.set_page_config(page_title="Sary AI", page_icon="🤖", layout="centered")
@@ -256,20 +256,21 @@ if "messages" not in st.session_state:
 
 messages_container = st.container()
 
-# 4. تصميم شريط البحث الاحترافي (تم إصلاح الخطأ هنا)
+# 4. تصميم شريط بحث احترافي (استخدام expander بدلاً من popover لحل مشكلة التشويه)
 st.markdown("---")
 if "uploaded_file_session" not in st.session_state:
     st.session_state.uploaded_file_session = None
 
-col1, col2, col3 = st.columns([0.2, 8.6, 0.2])
+# تعديل نسب الأعمدة لتكون متوازنة (0.5 لليسار، 8 للوسط، 0.5 لليمين)
+col1, col2, col3 = st.columns([0.5, 8, 0.5])
 
 with col1:
-    # إصلاح الخطأ: تم حذف label_visibility من st.popover (لأنها لا تقبل هذا الباراميتر)
-    with st.popover("📎"):
+    # st.expander يأخذ مساحة صغيرة ولا يزاحم التخطيط عند فتحه
+    with st.expander("📎", expanded=False):
         st.session_state.uploaded_file_session = st.file_uploader(
             "ارفع ملفاً (صور، PDF، نصوص، أكواد)", 
             type=None, 
-            label_visibility="collapsed", # هذا الباراميتر يعمل هنا بشكل صحيح
+            label_visibility="collapsed", 
             key="file_uploader_icon"
         )
 
