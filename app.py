@@ -114,7 +114,7 @@ def process_uploaded_file(uploaded_file, model_config):
     bytes_data = uploaded_file.getvalue()
     file_text = None
     base64_image = None
-    
+
     if mime_type in ["text/plain", "text/csv", "text/x-python", "application/json"]:
         file_text = bytes_data.decode("utf-8")
     elif mime_type == "application/pdf":
@@ -127,11 +127,11 @@ def process_uploaded_file(uploaded_file, model_config):
             base64_image = base64.b64encode(bytes_data).decode("utf-8")
         else:
             file_text = f"(نص مستخرج من الصورة المرفوعة '{filename}'):\n" + ocr_image_from_bytes(bytes_data)
-    
+
     return file_text, base64_image, mime_type
 
 
-def request_openai_compatible(api_key, endpoint, model, prompt, provider, max_tokens, base64_image=None, mime_type=None):
+def request_openai_compatible(api_key, endpoint, model, prompt, provider, max_tokens, base64_image=None, mime_type=None, temperature=0.7, top_p=0.9):
     messages = [{"role": "system", "content": SMART_UNRESTRICTED_PROMPT}]
     user_content = []
     if base64_image and mime_type:
@@ -140,7 +140,13 @@ def request_openai_compatible(api_key, endpoint, model, prompt, provider, max_to
     messages.append({"role": "user", "content": user_content})
 
     response = requests.post(endpoint, headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                             json={"model": model, "max_tokens": max_tokens, "messages": messages}, timeout=90)
+                             json={
+                                 "model": model, 
+                                 "max_tokens": max_tokens, 
+                                 "temperature": temperature,
+                                 "top_p": top_p,
+                                 "messages": messages
+                             }, timeout=90)
     raise_for_provider_error(response, provider)
     try:
         data = response.json()
@@ -150,7 +156,7 @@ def request_openai_compatible(api_key, endpoint, model, prompt, provider, max_to
     return message
 
 
-def request_gemini(api_key, model, prompt, max_tokens, base64_image=None, mime_type=None):
+def request_gemini(api_key, model, prompt, max_tokens, base64_image=None, mime_type=None, temperature=0.7, top_p=0.9):
     parts = []
     if base64_image and mime_type:
         parts.append({"inline_data": {"mime_type": mime_type, "data": base64_image}})
@@ -160,7 +166,11 @@ def request_gemini(api_key, model, prompt, max_tokens, base64_image=None, mime_t
                              headers={"Content-Type": "application/json"},
                              json={"systemInstruction": {"parts": [{"text": SMART_UNRESTRICTED_PROMPT}]},
                                    "contents": [{"role": "user", "parts": parts}],
-                                   "generationConfig": {"maxOutputTokens": max_tokens}}, timeout=90)
+                                   "generationConfig": {
+                                       "maxOutputTokens": max_tokens,
+                                       "temperature": temperature,
+                                       "topP": top_p
+                                   }}, timeout=90)
     raise_for_provider_error(response, "Google Gemini")
     try:
         data = response.json()
@@ -204,44 +214,57 @@ def request_replicate(api_key, prompt, max_tokens):
     raise RuntimeError("[Replicate] انتهت مهلة انتظار الاستجابة (90 ثانية).")
 
 
-def request_completion(selection: str, prompt: str, base64_image=None, mime_type=None) -> str:
+def request_completion(selection: str, prompt: str, base64_image=None, mime_type=None, temperature=0.7, top_p=0.9) -> str:
     config = MODEL_OPTIONS[selection]
     api_key = os.getenv(config["secret"])
     if not api_key:
         raise RuntimeError(f"لم يتم إعداد المفتاح '{config['secret']}' (مطلوب لتشغيل موديل '{selection}').")
     max_tokens = config.get("max_tokens", DEFAULT_MAX_TOKENS)
     provider = config["provider"]
+    
     if provider == "openrouter":
-        return request_openai_compatible(api_key, OPENROUTER_URL, config["model"], prompt, "OpenRouter", max_tokens, base64_image, mime_type)
+        return request_openai_compatible(api_key, OPENROUTER_URL, config["model"], prompt, "OpenRouter", max_tokens, base64_image, mime_type, temperature, top_p)
     if provider == "deepseek":
-        return request_openai_compatible(api_key, DEEPSEEK_URL, config["model"], prompt, "DeepSeek", max_tokens)
+        return request_openai_compatible(api_key, DEEPSEEK_URL, config["model"], prompt, "DeepSeek", max_tokens, base64_image, mime_type, temperature, top_p)
     if provider == "groq":
-        return request_openai_compatible(api_key, GROQ_URL, config["model"], prompt, "Groq", max_tokens)
+        return request_openai_compatible(api_key, GROQ_URL, config["model"], prompt, "Groq", max_tokens, base64_image, mime_type, temperature, top_p)
     if provider == "gemini":
-        return request_gemini(api_key, config["model"], prompt, max_tokens, base64_image, mime_type)
+        return request_gemini(api_key, config["model"], prompt, max_tokens, base64_image, mime_type, temperature, top_p)
     if provider == "huggingface":
-        return request_openai_compatible(api_key, HUGGINGFACE_URL, config["model"], prompt, "Hugging Face", max_tokens)
+        return request_openai_compatible(api_key, HUGGINGFACE_URL, config["model"], prompt, "Hugging Face", max_tokens, base64_image, mime_type, temperature, top_p)
     if provider == "replicate":
         return request_replicate(api_key, prompt, max_tokens)
     raise RuntimeError(f"مزود غير مدعوم: {provider}")
 
 
 # -----------------------------------------
-# التصميم النهائي (Sidebar + Chat Input نقي)
+# التصميم النهائي (Sidebar + Developer Mode + Chat Input نقي)
 # -----------------------------------------
 
 st.set_page_config(page_title="Sary AI", page_icon="🤖", layout="centered")
 
-# الشريط الجانبي (لاختيار النموذج ورفع الملفات)
+# الشريط الجانبي (لاختيار النموذج + وضع المطور)
 with st.sidebar:
     st.header("⚙️ الإعدادات")
     model = st.selectbox("اختر النموذج", list(MODEL_OPTIONS))
+    
+    st.markdown("---")
+    st.header("🛠️ وضع المطور (Developer Mode)")
+    st.caption("تحكم دقيق في استجابة النموذج")
+    
+    # إضافة أشرطة التحكم الخاصة بالمطور
+    temperature = st.slider("الإبداعية (Temperature)", min_value=0.0, max_value=2.0, value=0.7, step=0.1, 
+                            help="قيمة أعلى = إجابات أكثر إبداعاً وعشوائية، قيمة أقل = إجابات أكثر دقة ومنطقية.")
+    top_p = st.slider("تنوع الكلمات (Top-P)", min_value=0.0, max_value=1.0, value=0.9, step=0.05,
+                      help="يحدد تنوع الكلمات التي يختارها النموذج. 0.9 هي القيمة المثالية للمحادثات.")
+    
+    st.markdown("---")
     st.caption("📁 اسحب الملف وأفلته هنا")
     uploaded_file = st.file_uploader("ارفع ملفاً (صور، PDF، نصوص، أكواد)", type=None, label_visibility="collapsed")
 
 # الصفحة الرئيسية
 st.title("🤖 Sary AI")
-st.caption("جميع النماذج تدعم رفع الصور، النصوص، وملفات PDF.")
+st.caption("جميع النماذج تدعم رفع الصور، النصوص، وملفات PDF. (وضع المطور مفعل مع خيارات التحكم).")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -256,7 +279,6 @@ if prompt:
     base64_image = None
     mime_type = None
     
-    # التحقق مما إذا كان المستخدم قد رفع ملفًا في الشريط الجانبي
     if uploaded_file is not None:
         file_text, base64_image, mime_type = process_uploaded_file(uploaded_file, MODEL_OPTIONS[model])
         if file_text:
@@ -266,7 +288,15 @@ if prompt:
     
     with st.spinner("جاري الحصول على الإجابة..."):
         try:
-            answer = request_completion(model, prompt.strip(), base64_image, mime_type)
+            # تمرير اعدادات المطور (temperature و top_p) للدالة
+            answer = request_completion(
+                model, 
+                prompt.strip(), 
+                base64_image, 
+                mime_type, 
+                temperature=temperature, 
+                top_p=top_p
+            )
         except requests.exceptions.Timeout:
             answer = "⚠️ انتهت مهلة الاتصال. حاول مرة أخرى."
         except requests.exceptions.RequestException as error:
@@ -280,4 +310,3 @@ with messages_container:
     for message in reversed(st.session_state.messages):
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
-            
