@@ -1,2 +1,5 @@
 streamlit
 requests
+pytesseract
+pillow
+pypdf
