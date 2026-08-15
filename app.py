@@ -236,20 +236,15 @@ def request_completion(selection: str, prompt: str, base64_image=None, mime_type
 
 
 # -----------------------------------------
-# منطقة تصميم الواجهة (UI) النهائية الاحترافية (بدون تشويه)
+# منطقة الواجهة النهائية (شكل ChatGPT تماماً وبدون تشويه)
 # -----------------------------------------
 
 st.set_page_config(page_title="Sary AI", page_icon="🤖", layout="centered")
 
-# 1. الشريط الجانبي (لاختيار النموذج + رفع الملفات بالسحب والإفلات)
+# 1. الشريط الجانبي (لاختيار النموذج)
 with st.sidebar:
     st.header("⚙️ الإعدادات")
     model = st.selectbox("اختر النموذج", list(MODEL_OPTIONS))
-    
-    st.markdown("---")
-    st.caption("📁 اسحب وأفلت الملف هنا")
-    # هذا العنصر يدعم السحب والإفلات من سطح المكتب ولن يتشوه لأنه في الشريط الجانبي
-    uploaded_file = st.file_uploader("ارفع ملفاً (صور، PDF، نصوص، أكواد)", type=None, label_visibility="collapsed")
 
 # 2. العنوان
 st.title("🤖 Sary AI")
@@ -259,18 +254,38 @@ st.caption("جميع النماذج تدعم رفع الصور، النصوص، 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# مكان عرض الرسائل
 messages_container = st.container()
 
-# 4. صندوق المحادثة (نظيف 100%، بدون أي تشويه في التصميم)
-prompt = st.chat_input("اكتب سؤالك هنا...")
+# 4. شريط البحث الجديد (بتصميم ChatGPT موحد وبدون تشويه)
+st.markdown("---")
+if "uploaded_file_session" not in st.session_state:
+    st.session_state.uploaded_file_session = None
 
-# 5. منطق الإرسال ومعالجة الملفات (يقرأ الملف من الشريط الجانبي)
-if prompt:
+# استخدام form للحفاظ على العناصر في صف واحد
+with st.form(key="chat_bar", clear_on_submit=True):
+    # تقسيم الشاشة إلى 3 أعمدة بنسب متوازنة جداً
+    col1, col2, col3 = st.columns([0.6, 9, 0.6])
+    
+    with col1:
+        # زر المرفقات الصغير (اخفاء النص ليصبح مجرد زر)
+        uploaded_file = st.file_uploader("📎", type=None, label_visibility="collapsed", key="upload_btn")
+    
+    with col2:
+        # مربع الكتابة (بدون تسمية)
+        prompt = st.text_input("", placeholder="اكتب سؤالك هنا...", label_visibility="collapsed", key="input_bar")
+        
+    with col3:
+        # زر الإرسال
+        send_clicked = st.form_submit_button("➤", type="primary")
+
+# 5. منطق المعالجة والإرسال
+if send_clicked and prompt:
     file_text = None
     base64_image = None
     mime_type = None
     
-    # التحقق من وجود ملف مرفوع في الشريط الجانبي
+    # معالجة الملف إذا تم رفعه
     if uploaded_file is not None:
         file_text, base64_image, mime_type = process_uploaded_file(uploaded_file, MODEL_OPTIONS[model])
         if file_text:
@@ -289,7 +304,7 @@ if prompt:
             answer = f"⚠️ {error}"
     st.session_state.messages.append({"role": "assistant", "content": answer})
 
-# 6. عرض المحادثة (مع ظهور الأكواد بصناديق)
+# 6. عرض المحادثة
 with messages_container:
     for message in reversed(st.session_state.messages):
         with st.chat_message(message["role"]):
