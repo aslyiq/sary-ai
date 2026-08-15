@@ -236,15 +236,20 @@ def request_completion(selection: str, prompt: str, base64_image=None, mime_type
 
 
 # -----------------------------------------
-# منطقة تصميم الواجهة (UI) المعدلة للتصحيح النهائي
+# منطقة تصميم الواجهة (UI) النهائية الاحترافية (بدون تشويه)
 # -----------------------------------------
 
 st.set_page_config(page_title="Sary AI", page_icon="🤖", layout="centered")
 
-# 1. الشريط الجانبي
+# 1. الشريط الجانبي (لاختيار النموذج + رفع الملفات بالسحب والإفلات)
 with st.sidebar:
     st.header("⚙️ الإعدادات")
     model = st.selectbox("اختر النموذج", list(MODEL_OPTIONS))
+    
+    st.markdown("---")
+    st.caption("📁 اسحب وأفلت الملف هنا")
+    # هذا العنصر يدعم السحب والإفلات من سطح المكتب ولن يتشوه لأنه في الشريط الجانبي
+    uploaded_file = st.file_uploader("ارفع ملفاً (صور، PDF، نصوص، أكواد)", type=None, label_visibility="collapsed")
 
 # 2. العنوان
 st.title("🤖 Sary AI")
@@ -256,43 +261,20 @@ if "messages" not in st.session_state:
 
 messages_container = st.container()
 
-# 4. تصميم شريط بحث احترافي (استخدام expander بدلاً من popover لحل مشكلة التشويه)
-st.markdown("---")
-if "uploaded_file_session" not in st.session_state:
-    st.session_state.uploaded_file_session = None
+# 4. صندوق المحادثة (نظيف 100%، بدون أي تشويه في التصميم)
+prompt = st.chat_input("اكتب سؤالك هنا...")
 
-# تعديل نسب الأعمدة لتكون متوازنة (0.5 لليسار، 8 للوسط، 0.5 لليمين)
-col1, col2, col3 = st.columns([0.5, 8, 0.5])
-
-with col1:
-    # st.expander يأخذ مساحة صغيرة ولا يزاحم التخطيط عند فتحه
-    with st.expander("📎", expanded=False):
-        st.session_state.uploaded_file_session = st.file_uploader(
-            "ارفع ملفاً (صور، PDF، نصوص، أكواد)", 
-            type=None, 
-            label_visibility="collapsed", 
-            key="file_uploader_icon"
-        )
-
-with col2:
-    prompt = st.text_input("اكتب سؤالك هنا...", label_visibility="collapsed", key="user_query")
-
-with col3:
-    send = st.button("➤", type="primary", key="send_btn")
-
-# 5. منطق الإرسال ومعالجة الملفات
-if send and prompt:
-    uploaded_file = st.session_state.uploaded_file_session
-    
+# 5. منطق الإرسال ومعالجة الملفات (يقرأ الملف من الشريط الجانبي)
+if prompt:
     file_text = None
     base64_image = None
     mime_type = None
     
+    # التحقق من وجود ملف مرفوع في الشريط الجانبي
     if uploaded_file is not None:
         file_text, base64_image, mime_type = process_uploaded_file(uploaded_file, MODEL_OPTIONS[model])
         if file_text:
             prompt = f"محتوى الملف المرفوع:\n{file_text}\n\nسؤالي:\n{prompt}"
-        st.session_state.uploaded_file_session = None
 
     st.session_state.messages.append({"role": "user", "content": prompt.strip()})
     
@@ -307,7 +289,7 @@ if send and prompt:
             answer = f"⚠️ {error}"
     st.session_state.messages.append({"role": "assistant", "content": answer})
 
-# 6. عرض المحادثة
+# 6. عرض المحادثة (مع ظهور الأكواد بصناديق)
 with messages_container:
     for message in reversed(st.session_state.messages):
         with st.chat_message(message["role"]):
