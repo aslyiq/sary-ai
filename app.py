@@ -82,10 +82,8 @@ def raise_for_provider_error(response: requests.Response, provider: str) -> None
         if isinstance(error, dict): error_message = error.get("message") or error.get("detail")
         else: error_message = error
     except (ValueError, AttributeError): error_message = None
-
     if not error_message:
-        raw_body = (response.text or "").strip()
-        if raw_body: raw_body = raw_body[:300]
+        raw_body = (response.text or "").strip()[:300]
         error_message = f"[{provider}] رمز الحالة {response.status_code}" + (f": {raw_body}" if raw_body else "")
     raise RuntimeError(str(error_message))
 
@@ -144,7 +142,6 @@ def request_openai_compatible(api_key, endpoint, model, prompt, provider, max_to
     response = requests.post(endpoint, headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                              json={"model": model, "max_tokens": max_tokens, "messages": messages}, timeout=90)
     raise_for_provider_error(response, provider)
-
     try:
         data = response.json()
         message = extract_text(data["choices"][0]["message"]["content"])
@@ -165,7 +162,6 @@ def request_gemini(api_key, model, prompt, max_tokens, base64_image=None, mime_t
                                    "contents": [{"role": "user", "parts": parts}],
                                    "generationConfig": {"maxOutputTokens": max_tokens}}, timeout=90)
     raise_for_provider_error(response, "Google Gemini")
-
     try:
         data = response.json()
         message = extract_text(data["candidates"][0]["content"]["parts"])
@@ -183,7 +179,6 @@ def request_replicate(api_key, prompt, max_tokens):
     response = requests.post(REPLICATE_URL, headers=headers,
                              json={"version": REPLICATE_VERSION, "input": {"prompt": compose_text_prompt(prompt), "max_new_tokens": max_tokens}}, timeout=90)
     raise_for_provider_error(response, "Replicate")
-
     try:
         prediction = response.json()
         poll_url = prediction.get("urls", {}).get("get")
@@ -193,14 +188,12 @@ def request_replicate(api_key, prompt, max_tokens):
             raise RuntimeError(f"[Replicate] لم يُرجع رابط متابعة للتنبؤ. الرد الخام: {response.text[:300]}")
     except (ValueError, AttributeError, TypeError) as error:
         raise RuntimeError(f"[Replicate] استجابة غير متوقعة: {type(error).__name__}: {error} — النص الخام: {response.text[:300]}") from error
-
     deadline = time.monotonic() + 90
     while time.monotonic() < deadline:
         poll_response = requests.get(poll_url, headers=headers, timeout=30)
         raise_for_provider_error(poll_response, "Replicate")
         prediction = poll_response.json()
         status = prediction.get("status")
-
         if status == "succeeded":
             message = extract_text(prediction.get("output"))
             if message: return message
@@ -216,10 +209,8 @@ def request_completion(selection: str, prompt: str, base64_image=None, mime_type
     api_key = os.getenv(config["secret"])
     if not api_key:
         raise RuntimeError(f"لم يتم إعداد المفتاح '{config['secret']}' (مطلوب لتشغيل موديل '{selection}').")
-
     max_tokens = config.get("max_tokens", DEFAULT_MAX_TOKENS)
     provider = config["provider"]
-    
     if provider == "openrouter":
         return request_openai_compatible(api_key, OPENROUTER_URL, config["model"], prompt, "OpenRouter", max_tokens, base64_image, mime_type)
     if provider == "deepseek":
@@ -236,56 +227,36 @@ def request_completion(selection: str, prompt: str, base64_image=None, mime_type
 
 
 # -----------------------------------------
-# منطقة الواجهة النهائية (شكل ChatGPT تماماً وبدون تشويه)
+# التصميم النهائي (Sidebar + Chat Input نقي)
 # -----------------------------------------
 
 st.set_page_config(page_title="Sary AI", page_icon="🤖", layout="centered")
 
-# 1. الشريط الجانبي (لاختيار النموذج)
+# الشريط الجانبي (لاختيار النموذج ورفع الملفات)
 with st.sidebar:
     st.header("⚙️ الإعدادات")
     model = st.selectbox("اختر النموذج", list(MODEL_OPTIONS))
+    st.caption("📁 اسحب الملف وأفلته هنا")
+    uploaded_file = st.file_uploader("ارفع ملفاً (صور، PDF، نصوص، أكواد)", type=None, label_visibility="collapsed")
 
-# 2. العنوان
+# الصفحة الرئيسية
 st.title("🤖 Sary AI")
 st.caption("جميع النماذج تدعم رفع الصور، النصوص، وملفات PDF.")
 
-# 3. سجل المحادثة
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# مكان عرض الرسائل
 messages_container = st.container()
 
-# 4. شريط البحث الجديد (بتصميم ChatGPT موحد وبدون تشويه)
-st.markdown("---")
-if "uploaded_file_session" not in st.session_state:
-    st.session_state.uploaded_file_session = None
+# استخدام st.chat_input النقي، وهو مخصص للعمل بدون أي تشويه
+prompt = st.chat_input("اكتب سؤالك هنا...")
 
-# استخدام form للحفاظ على العناصر في صف واحد
-with st.form(key="chat_bar", clear_on_submit=True):
-    # تقسيم الشاشة إلى 3 أعمدة بنسب متوازنة جداً
-    col1, col2, col3 = st.columns([0.6, 9, 0.6])
-    
-    with col1:
-        # زر المرفقات الصغير (اخفاء النص ليصبح مجرد زر)
-        uploaded_file = st.file_uploader("📎", type=None, label_visibility="collapsed", key="upload_btn")
-    
-    with col2:
-        # مربع الكتابة (بدون تسمية)
-        prompt = st.text_input("", placeholder="اكتب سؤالك هنا...", label_visibility="collapsed", key="input_bar")
-        
-    with col3:
-        # زر الإرسال
-        send_clicked = st.form_submit_button("➤", type="primary")
-
-# 5. منطق المعالجة والإرسال
-if send_clicked and prompt:
+if prompt:
     file_text = None
     base64_image = None
     mime_type = None
     
-    # معالجة الملف إذا تم رفعه
+    # التحقق مما إذا كان المستخدم قد رفع ملفًا في الشريط الجانبي
     if uploaded_file is not None:
         file_text, base64_image, mime_type = process_uploaded_file(uploaded_file, MODEL_OPTIONS[model])
         if file_text:
@@ -304,8 +275,9 @@ if send_clicked and prompt:
             answer = f"⚠️ {error}"
     st.session_state.messages.append({"role": "assistant", "content": answer})
 
-# 6. عرض المحادثة
+# عرض المحادثة
 with messages_container:
     for message in reversed(st.session_state.messages):
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
+            
