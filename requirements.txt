@@ -7,3 +7,4 @@ pypdf
 protobuf
 protobuf==5.28.3
 protobuf<=5.28.3
+tiktoken
