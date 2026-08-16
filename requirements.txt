@@ -8,3 +8,4 @@ protobuf
 protobuf==5.28.3
 protobuf<=5.28.3
 tiktoken
+beautifulsoup4>=4.12.0
