@@ -62,10 +62,7 @@ MODEL_OPTIONS = {
         "provider": "groq", "model": "llama-3.3-70b-versatile", "secret": "GROQ_API_KEY",
         "default_max_tokens": 4096, "supports_vision": False, "supports_stream": True,
     },
-    "🧠 DeepSeek R1 (Free)": {
-        "provider": "openrouter", "model": "deepseek/deepseek-r1:free", "secret": "OPENROUTER_API_KEY",
-        "default_max_tokens": 8192, "supports_vision": False, "supports_stream": True,
-    },
+    # تم حذف DeepSeek R1
     "⚡ DeepSeek V3 (Free)": {
         "provider": "openrouter", "model": "deepseek/deepseek-chat", "secret": "OPENROUTER_API_KEY",
         "default_max_tokens": 4096, "supports_vision": False, "supports_stream": True,
