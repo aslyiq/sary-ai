@@ -1,6 +1,9 @@
-streamlit==1.28.1
+streamlit
 requests
 PySocks
 Pillow
 pytesseract
 pypdf
+protobuf
+protobuf==5.28.3
+protobuf<=5.28.3
