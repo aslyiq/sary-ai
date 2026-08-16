@@ -1,5 +1,6 @@
-streamlit>=1.36.0
+streamlit
 requests
+PySocks
+Pillow
 pytesseract
-pillow
 pypdf
